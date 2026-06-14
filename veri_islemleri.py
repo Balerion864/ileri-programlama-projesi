@@ -2,7 +2,6 @@ import json
 from models import Takim, Oyuncu, Mac
 
 def verileri_kaydet(takimlar, maclar, dosya_adi="veriler.json"):
-    """Sistemdeki tüm takımları, oyuncuları ve maçları JSON dosyasına kaydeder."""
     data = {"takimlar": [], "maclar": []}
     
     for t in takimlar:
@@ -36,8 +35,8 @@ def verileri_kaydet(takimlar, maclar, dosya_adi="veriler.json"):
     with open(dosya_adi, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
 
+
 def verileri_yukle(dosya_adi="veriler.json"):
-    """JSON dosyasındaki verileri okuyup Takim, Oyuncu ve Mac nesnelerine dönüştürür."""
     takimlar = []
     maclar = []
     try:
@@ -58,33 +57,32 @@ def verileri_yukle(dosya_adi="veriler.json"):
                 takimlar.append(t)
                 
             for m_data in data.get("maclar", []):
-                m = Mac(m_data["ev_sahibi"], m_data["deplasman"], m_data["ev_skor"], m_data["dep_skor"], m_data["tarih"])
+                # eski veriyi yuklerken sayaci bozmamasi icin yeni_kayit=False dedik
+                m = Mac(m_data["ev_sahibi"], m_data["deplasman"], m_data["ev_skor"], m_data["dep_skor"], m_data["tarih"], yeni_kayit=False)
                 maclar.append(m)
                 
     except FileNotFoundError:
         pass
-    except json.JSONDecodeError as e:
-        print(f"Veri dosyası okunamadı veya bozuk: {e}")
+    except Exception as e:
+        print(f"Veriler okunurken bir hata olustu: {e}")
         
     return takimlar, maclar
 
+
 def txt_raporu_olustur(takimlar, dosya_adi="rapor.txt"):
-    """Sistemdeki genel istatistikleri düzenli bir metin dosyası olarak masaüstüne çıkarır."""
     with open(dosya_adi, "w", encoding="utf-8") as f:
-        f.write("--- TURNUVA GENEL RAPORU ---\n\n")
+        f.write("--- TURNUVA RAPORU ---\n\n")
         
-        # Puan durumu kısmı
         sirali_takimlar = sorted(takimlar, key=lambda x: x.puan, reverse=True)
         f.write("PUAN DURUMU:\n")
-        f.write("Takim Adı | G | B | M | Puan\n")
+        f.write("Takim Adi | G | B | M | Puan\n")
         f.write("-" * 35 + "\n")
         for t in sirali_takimlar:
             f.write(f"{t.ad:10} | {t.galibiyet} | {t.beraberlik} | {t.maglubiyet} | {t.puan}\n")
             
-        # Genel özet
-        f.write("\n" + "="*35 + "\n\n")
-        f.write("TAKIM KADROLARI VE OYUNCU İSTATİSTİKLERİ:\n")
+        f.write("\n===================================\n\n")
+        f.write("OYUNCU ISTATISTIKLERI:\n")
         for t in takimlar:
-            f.write(f"\n[{t.ad} Kadrosu]\n")
+            f.write(f"\n[{t.ad}]\n")
             for o in t.oyuncular:
-                f.write(f"- {o.ad} ({o.mevki}) -> Gol: {o.gol}, Asist: {o.asist}\n")
+                f.write(f"- {o.ad} ({o.mevki}) - Gol: {o.gol}, Asist: {o.asist}\n")

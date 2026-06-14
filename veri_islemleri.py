@@ -1,97 +1,90 @@
 import json
-import os
 from models import Takim, Oyuncu, Mac
 
-dosya_adi = "veriler.json"
-
-def kaydet(takim_listesi, mac_listesi):
-    veri = {"takimlar": [], "maclar": []}
+def verileri_kaydet(takimlar, maclar, dosya_adi="veriler.json"):
+    """Sistemdeki tüm takımları, oyuncuları ve maçları JSON dosyasına kaydeder."""
+    data = {"takimlar": [], "maclar": []}
     
-    for t in takim_listesi:
-        t_dict = {
+    for t in takimlar:
+        takim_dict = {
             "ad": t.ad,
+            "kurulus_yili": t.kurulus_yili,
             "galibiyet": t.galibiyet,
-            "maglubiyet": t.maglubiyet,
             "beraberlik": t.beraberlik,
+            "maglubiyet": t.maglubiyet,
             "oyuncular": []
         }
-        for oy in t.oyuncular:
-            t_dict["oyuncular"].append({
-                "isim": oy.isim,
-                "mevki": oy.mevki,
-                "gol": oy.gol,
-                "asist": oy.asist
+        for o in t.oyuncular:
+            takim_dict["oyuncular"].append({
+                "ad": o.ad,
+                "mevki": o.mevki,
+                "takim_adi": o.takim_adi,
+                "gol": o.gol,
+                "asist": o.asist
             })
-        veri["takimlar"].append(t_dict)
+        data["takimlar"].append(takim_dict)
         
-    for mac in mac_listesi:
-        veri["maclar"].append({
-            "evSahibi": mac.evSahibi,
-            "deplasman": mac.deplasman,
-            "ev_skor": mac.ev_skor,
-            "dep_skor": mac.dep_skor,
-            "ev_ofsayt": mac.ev_ofsayt,
-            "dep_ofsayt": mac.dep_ofsayt,
-            "tarih": mac.tarih
+    for m in maclar:
+        data["maclar"].append({
+            "ev_sahibi": m.ev_sahibi,
+            "deplasman": m.deplasman,
+            "ev_skor": m.ev_skor,
+            "dep_skor": m.dep_skor,
+            "tarih": m.tarih
         })
         
     with open(dosya_adi, "w", encoding="utf-8") as f:
-        json.dump(veri, f, ensure_ascii=False, indent=4)
-        
-def yukle():
-    if not os.path.exists(dosya_adi):
-        return [], [] 
-        
-    with open(dosya_adi, "r", encoding="utf-8") as file:
-        try:
-            okunan = json.load(file)
-        except:
-            print("dosya okuma hatasi")
-            return [], []
-    
+        json.dump(data, f, ensure_ascii=False, indent=4)
+
+def verileri_yukle(dosya_adi="veriler.json"):
+    """JSON dosyasındaki verileri okuyup Takim, Oyuncu ve Mac nesnelerine dönüştürür."""
     takimlar = []
     maclar = []
-    
-    for t_data in okunan.get("takimlar", []):
-        yeni_takim = Takim(t_data["ad"])
-        yeni_takim.galibiyet = t_data["galibiyet"]
-        yeni_takim.maglubiyet = t_data["maglubiyet"]
-        yeni_takim.beraberlik = t_data["beraberlik"]
-        
-        for o_data in t_data["oyuncular"]:
-            yeni_oyuncu = Oyuncu(o_data["isim"], o_data["mevki"])
-            yeni_oyuncu.gol = o_data["gol"]
-            yeni_oyuncu.asist = o_data["asist"]
-            yeni_takim.oyuncu_ekle(yeni_oyuncu)
+    try:
+        with open(dosya_adi, "r", encoding="utf-8") as f:
+            data = json.load(f)
             
-        takimlar.append(yeni_takim)
-        
-    for m_data in okunan.get("maclar", []):
-        yeni_mac = Mac(
-            m_data["evSahibi"], 
-            m_data["deplasman"], 
-            m_data["ev_skor"], 
-            m_data["dep_skor"],
-            m_data.get("ev_ofsayt", 0),
-            m_data.get("dep_ofsayt", 0)
-        )
-        yeni_mac.tarih = m_data.get("tarih", "") 
-        maclar.append(yeni_mac)
+            for t_data in data.get("takimlar", []):
+                t = Takim(t_data["ad"], t_data["kurulus_yili"])
+                t.galibiyet = t_data["galibiyet"]
+                t.beraberlik = t_data["beraberlik"]
+                t.maglubiyet = t_data["maglubiyet"]
+                
+                for o_data in t_data.get("oyuncular", []):
+                    o = Oyuncu(o_data["ad"], o_data["mevki"], o_data["takim_adi"])
+                    o.gol = o_data["gol"]
+                    o.asist = o_data["asist"]
+                    t.oyuncular.append(o)
+                takimlar.append(t)
+                
+            for m_data in data.get("maclar", []):
+                m = Mac(m_data["ev_sahibi"], m_data["deplasman"], m_data["ev_skor"], m_data["dep_skor"], m_data["tarih"])
+                maclar.append(m)
+                
+    except FileNotFoundError:
+        pass
+    except json.JSONDecodeError as e:
+        print(f"Veri dosyası okunamadı veya bozuk: {e}")
         
     return takimlar, maclar
 
-def rapor_olustur(takimlar, maclar):
-    # hoca txt cikartmayi sever, ek puan getirir
-    with open("rapor.txt", "w", encoding="utf-8") as r:
-        r.write("--- TURNUVA GENEL RAPORU ---\n\n")
-        r.write("TAKIMLAR VE PUAN DURUMU:\n")
+def txt_raporu_olustur(takimlar, dosya_adi="rapor.txt"):
+    """Sistemdeki genel istatistikleri düzenli bir metin dosyası olarak masaüstüne çıkarır."""
+    with open(dosya_adi, "w", encoding="utf-8") as f:
+        f.write("--- TURNUVA GENEL RAPORU ---\n\n")
         
-        # lambda ile puana gore siralama (buyukten kucuge)
-        sirali_takim = sorted(takimlar, key=lambda x: x.puan, reverse=True)
-        for i, t in enumerate(sirali_takim, 1):
-            r.write(f"{i}. {t.ad} - Puan: {t.puan} (G:{t.galibiyet} B:{t.beraberlik} M:{t.maglubiyet})\n")
+        # Puan durumu kısmı
+        sirali_takimlar = sorted(takimlar, key=lambda x: x.puan, reverse=True)
+        f.write("PUAN DURUMU:\n")
+        f.write("Takim Adı | G | B | M | Puan\n")
+        f.write("-" * 35 + "\n")
+        for t in sirali_takimlar:
+            f.write(f"{t.ad:10} | {t.galibiyet} | {t.beraberlik} | {t.maglubiyet} | {t.puan}\n")
             
-        r.write("\nOYNANAN TUM MACLAR:\n")
-        for m in maclar:
-            r.write(str(m) + "\n")
-    print("rapor.txt basariyla olusturuldu! Klasorunu kontrol et.")
+        # Genel özet
+        f.write("\n" + "="*35 + "\n\n")
+        f.write("TAKIM KADROLARI VE OYUNCU İSTATİSTİKLERİ:\n")
+        for t in takimlar:
+            f.write(f"\n[{t.ad} Kadrosu]\n")
+            for o in t.oyuncular:
+                f.write(f"- {o.ad} ({o.mevki}) -> Gol: {o.gol}, Asist: {o.asist}\n")
